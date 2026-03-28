@@ -1,0 +1,339 @@
+import os
+import subprocess
+import time
+import requests
+import random
+import socket
+import json
+import difflib
+import sys
+import termios
+import tty
+from escpos.printer import Usb
+from PIL import Image
+from io import BytesIO
+
+# ---------------- CONFIG ----------------
+CREATURE_API = "https://api.scryfall.com/cards/search?q=type:creature&unique=cards"
+TOKEN_API = "https://api.scryfall.com/cards/search?q=type:token"
+CREATURE_FILE = "/home/momir/creatures.json"
+TOKEN_FILE = "/home/momir/tokens.json"
+IMAGE_FOLDER = "/home/momir/cards"
+PRINTER_MAX_WIDTH = 384
+CACHE_DAYS = 7
+
+PRINTER_VENDOR_ID = 0x04b8
+PRINTER_PRODUCT_ID = 0x0202
+
+WIFI_NETWORKS = [
+    {"ssid": "YourHomeWiFi", "password": "homepassword"},
+    {"ssid": "MyHotspot", "password": "hotspotpassword"}
+]
+
+os.makedirs(IMAGE_FOLDER, exist_ok=True)
+
+# ---------------- ESC-INPUT ----------------
+def esc_input(prompt="> "):
+    """Get input from user, ESC returns None"""
+    print(prompt, end="", flush=True)
+    buf = ""
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        while True:
+            ch = sys.stdin.read(1)
+            if ch == "\x1b":  # ESC key
+                print("\nESC pressed! Returning to main menu.")
+                return None
+            elif ch in ("\r", "\n"):
+                print()
+                return buf
+            elif ch == "\x7f":  # Backspace
+                if buf:
+                    buf = buf[:-1]
+                    sys.stdout.write("\b \b")
+            else:
+                buf += ch
+                sys.stdout.write(ch)
+                sys.stdout.flush()
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+# ---------------- NETWORK ----------------
+def connect_to_wifi():
+    for net in WIFI_NETWORKS:
+        try:
+            print(f"Trying WiFi: {net['ssid']}")
+            subprocess.run(
+                ["nmcli", "dev", "wifi", "connect", net["ssid"], "password", net["password"]],
+                check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+            print(f"Connected to {net['ssid']}")
+            return True
+        except:
+            pass
+    return False
+
+def is_connected():
+    try:
+        socket.create_connection(("1.1.1.1", 53), timeout=3)
+        return True
+    except:
+        return False
+
+# ---------------- CACHE ----------------
+def needs_update(path):
+    if not os.path.exists(path):
+        return True
+    age = (time.time() - os.path.getmtime(path)) / 86400
+    return age > CACHE_DAYS
+
+def save_json(path, data):
+    with open(path, "w") as f:
+        json.dump(data, f)
+
+def load_json(path):
+    if not os.path.exists(path):
+        return []
+    with open(path, "r") as f:
+        return json.load(f)
+
+# ---------------- DOWNLOAD ----------------
+def download_all(url, label):
+    print(f"Downloading {label}...")
+    cards = []
+    while url:
+        r = requests.get(url)
+        data = r.json()
+        cards.extend(data["data"])
+        url = data.get("next_page")
+        print(f"{label}: {len(cards)} loaded...")
+    return cards
+
+def update_creatures():
+    cards = download_all(CREATURE_API, "Creatures")
+    filtered = [c for c in cards if "cmc" in c]
+    save_json(CREATURE_FILE, filtered)
+    print(f"Saved {len(filtered)} creatures")
+    return filtered
+
+def update_tokens():
+    cards = download_all(TOKEN_API, "Tokens")
+    save_json(TOKEN_FILE, cards)
+    print(f"Saved {len(cards)} tokens")
+    return cards
+
+# ---------------- IMAGE ----------------
+def get_image_url(card):
+    if "image_uris" in card:
+        return card["image_uris"]["normal"]
+    elif "card_faces" in card:
+        return card["card_faces"][0]["image_uris"]["normal"]
+    return None
+
+def get_image_path(card):
+    return os.path.join(IMAGE_FOLDER, f"{card['id']}.png")
+
+def download_image(card):
+    path = get_image_path(card)
+    if os.path.exists(path):
+        return path
+
+    url = get_image_url(card)
+    if not url:
+        return None
+
+    img = Image.open(BytesIO(requests.get(url).content)).convert("L")
+
+    scale = PRINTER_MAX_WIDTH / img.width
+    w = int(img.width * scale * 1.2)
+    h = int(img.height * scale * 1.2)
+
+    img = img.resize((w, h), Image.LANCZOS).convert("1")
+    img.save(path)
+    return path
+
+def print_image(path):
+    try:
+        p = Usb(PRINTER_VENDOR_ID, PRINTER_PRODUCT_ID, profile="TM-T88V")
+        p.image(path)
+        p.cut()
+        p.close()
+    except Exception as e:
+        print("Printer error:", e)
+
+# ---------------- CREATURE MODE ----------------
+def creature_mode(cards):
+    print("Enter CMC (1–16) (ESC to return):")
+    while True:
+        x = esc_input("> ")
+        if x is None:
+            return  # ESC → back to main menu
+        if not x.isdigit() or not (1 <= int(x) <= 16):
+            print("Invalid input")
+            continue
+
+        cmc = int(x)
+        matches = [c for c in cards if int(c.get("cmc", -1)) == cmc]
+        if not matches:
+            print("No match")
+            continue
+
+        card = random.choice(matches)
+        print("Printing:", card["name"])
+        path = download_image(card)
+        if path:
+            print_image(path)
+
+# ---------------- TOKEN MATCHING ----------------
+def smart_match(tokens, name):
+    name = name.lower().strip()
+
+    exact = [t for t in tokens if t["name"].lower() == name]
+    if exact:
+        return exact
+
+    exact_token = [t for t in tokens if t["name"].lower() == f"{name} token"]
+    if exact_token:
+        return exact_token
+
+    substring = [t for t in tokens if name in t["name"].lower()]
+    if substring:
+        return substring
+
+    names = [t["name"] for t in tokens]
+    close = difflib.get_close_matches(name, names, n=10, cutoff=0.7)
+    return [t for t in tokens if t["name"] in close]
+
+def filter_pt(tokens, pt):
+    try:
+        p, t = pt.split("/")
+        return [c for c in tokens if c.get("power") == p and c.get("toughness") == t]
+    except:
+        return tokens
+
+def filter_color(tokens, text):
+    color_map = {"white":"W","blue":"U","black":"B","red":"R","green":"G"}
+    desired = set(color_map.get(c) for c in text.split() if c in color_map)
+    return [t for t in tokens if set(t.get("colors", [])) == desired]
+
+def choose_from_list(matches):
+    print("\nMultiple matches found:")
+    for i, m in enumerate(matches[:10]):
+        pt = f"{m.get('power','?')}/{m.get('toughness','?')}"
+        colors = "".join(m.get("colors", []))
+        print(f"{i+1}: {m['name']} ({pt}) [{colors}]")
+
+    while True:
+        choice = esc_input("Select number: ")
+        if choice is None:
+            return None
+        if choice.isdigit():
+            idx = int(choice) - 1
+            if 0 <= idx < len(matches[:10]):
+                return matches[idx]
+        print("Invalid selection.")
+
+# ---------------- TOKEN MODE ----------------
+def print_multiple(path):
+    count_input = esc_input("How many copies? (default 1): ").strip()
+
+    if count_input == "":
+        count = 1
+    elif count_input.isdigit() and int(count_input) > 0:
+        count = int(count_input)
+    else:
+        print("Invalid input, printing 1 copy.")
+        count = 1
+
+    for i in range(count):
+        print(f"Printing copy {i+1}/{count}")
+        print_image(path)
+        time.sleep(0.3)
+
+def token_mode(tokens):
+    while True:
+        name = esc_input("\nToken name (ESC to return): ")
+        if name is None:
+            return
+
+        matches = smart_match(tokens, name)
+        if not matches:
+            print("No matches found.")
+            continue
+
+        if len(matches) == 1:
+            card = matches[0]
+        else:
+            pt_input = esc_input("Optional PT (e.g. 3/3): ")
+            if pt_input is None:
+                return
+            if pt_input:
+                filtered = filter_pt(matches, pt_input)
+                if filtered:
+                    matches = filtered
+
+            if len(matches) > 1:
+                color_input = esc_input("Optional color(s): ").strip().lower()
+                if color_input is None:
+                    return
+                if color_input:
+                    filtered = filter_color(matches, color_input)
+                    if filtered:
+                        matches = filtered
+
+            if len(matches) > 1:
+                card = choose_from_list(matches)
+                if card is None:
+                    return  # ESC pressed
+            else:
+                card = matches[0]
+
+        print("Printing:", card["name"])
+        path = download_image(card)
+        if path:
+            print_multiple(path)
+        else:
+            print("Failed to download image.")
+
+# ---------------- MAIN ----------------
+def main():
+    print("Connecting WiFi first...")
+    connect_to_wifi()
+
+    online = is_connected()
+
+    if needs_update(CREATURE_FILE) and online:
+        creatures = update_creatures()
+    else:
+        creatures = load_json(CREATURE_FILE)
+        print(f"Loaded {len(creatures)} creatures")
+
+    if needs_update(TOKEN_FILE) and online:
+        tokens = update_tokens()
+    else:
+        tokens = load_json(TOKEN_FILE)
+        print(f"Loaded {len(tokens)} tokens")
+
+    if not creatures and not tokens:
+        print("No data available.")
+        return
+
+    while True:
+        print("\nSelect mode (ESC to exit):")
+        print("1 - Creature (CMC)")
+        print("2 - Token")
+        mode = esc_input("> ")
+        if mode is None:
+            print("Exiting program.")
+            return
+        elif mode == "1":
+            creature_mode(creatures)
+        elif mode == "2":
+            token_mode(tokens)
+        else:
+            print("Invalid mode")
+
+if __name__ == "__main__":
+    main()
