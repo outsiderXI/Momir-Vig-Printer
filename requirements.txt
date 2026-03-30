@@ -3,3 +3,4 @@ pillow
 rapidfuzz
 rich
 python-escpos
+pyusb
