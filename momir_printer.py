@@ -299,6 +299,27 @@ def filter_color(tokens, text):
     desired = set(color_map.get(c) for c in text.split() if c in color_map)
     return [t for t in tokens if set(t.get("colors", [])) == desired]
 
+# ---------------- KEYWORD EXTRACTION ----------------
+def extract_keywords(card):
+    text = card.get("oracle_text", "")
+    if not text:
+        return "No abilities"
+
+    # Common MTG keywords to look for
+    keywords = [
+        "flying", "trample", "vigilance", "haste", "deathtouch",
+        "lifelink", "first strike", "double strike", "menace",
+        "reach", "hexproof", "indestructible", "ward"
+    ]
+
+    found = [k for k in keywords if k in text.lower()]
+
+    if found:
+        return ", ".join(found)
+
+    # fallback: shorten oracle text
+    return text.split("\n")[0][:60]
+
 def choose_from_list(matches):
     print("\nMultiple matches found:")
     for i, m in enumerate(matches[:10]):
