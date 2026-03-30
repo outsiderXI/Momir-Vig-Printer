@@ -6,6 +6,10 @@ from downloader import *
 from search import search_card
 from printer import print_card
 from input_utils import esc_input
+from downloader import initialize_database
+from search import search_card
+from printer import print_card, print_image
+from tokens import load_tokens, smart_token_match
 
 console = Console()
 
@@ -24,7 +28,52 @@ def show_menu():
 
     return esc_input()
 
+
+def momir_mode():
+
+    console.print("Momir Vig Mode")
+
+    while True:
+
+        name = esc_input("Creature name: ")
+
+        if name is None:
+            return
+
+        cid = search_card(name)
+
+        if not cid:
+            console.print("Card not found")
+            continue
+
+        print_card(cid)
+
+def token_mode():
+
+    console.print("Token Mode")
+
+    tokens = load_tokens()
+
+    while True:
+
+        name = esc_input("Token name: ")
+
+        if name is None:
+            return
+
+        matches = smart_token_match(tokens, name)
+
+        if not matches:
+            console.print("Token not found")
+            continue
+
+        token = matches[0]
+
+        print_image(token["local_image"])
+
 def main():
+
+    initialize_database()
 
     while True:
 
@@ -33,29 +82,11 @@ def main():
         if option is None:
             break
 
-        if option=="1":
-            download_bulk_database()
+        if option == "1":
+            momir_mode()
 
-        elif option=="2":
-            build_sqlite_index()
-
-        elif option=="3":
-            download_all_images()
-
-        elif option=="4":
-
-            name = esc_input("Card name: ")
-
-            if not name:
-                continue
-
-            cid = search_card(name)
-
-            if not cid:
-                console.print("Card not found")
-                continue
-
-            print_card(cid)
+        elif option == "2":
+            token_mode()
 
 if __name__ == "__main__":
     main()
