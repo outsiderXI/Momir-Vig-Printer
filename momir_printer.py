@@ -114,31 +114,45 @@ def show_momir_vig_ascii():
 """
     lines = ascii_art.split("\n")
 
-    # ANSI color codes
-    GREEN = "\033[38;5;46m"
-    BLUE = "\033[38;5;27m"
     RESET = "\033[0m"
 
-    for i, line in enumerate(lines):
-        # Blend from green (top) to blue (bottom)
-        ratio = i / max(len(lines) - 1, 1)
+    # Gradient stops (256-color palette)
+    # white → blue → purple → red → green
+    gradient_colors = [15, 51, 27, 63, 93, 129, 161, 196, 202, 46]
 
-        # Simple gradient switch midpoint
-        color_code = int(46 + (27 - 46) * ratio)  # green → blue
+    def interpolate(c1, c2, t):
+        return int(c1 + (c2 - c1) * t)
+
+    def get_color(ratio):
+        # Map ratio across multiple segments
+        segment_count = len(gradient_colors) - 1
+        scaled = ratio * segment_count
+
+        idx = int(scaled)
+        t = scaled - idx
+
+        if idx >= segment_count:
+            return gradient_colors[-1]
+
+        return interpolate(gradient_colors[idx], gradient_colors[idx + 1], t)
+
+    for i, line in enumerate(lines):
+        ratio = i / max(len(lines) - 1, 1)
+        color_code = get_color(ratio)
         color = f"\033[38;5;{color_code}m"
 
         for ch in line:
-            if ch.strip():  # only color visible chars
+            if ch.strip():
                 sys.stdout.write(f"{color}{ch}{RESET}")
             else:
                 sys.stdout.write(ch)
 
             sys.stdout.flush()
-            time.sleep(0.0008)  # speed of fade-in (lower = faster)
+            time.sleep(0.0006)
 
         sys.stdout.write("\n")
 
-    print("\n\033[38;5;51mMomir Vig, Simic Visionary\033[0m\n")
+    print("\n\033[38;5;87mMomir Vig | Magic's Luckiest Minigame\033[0m\n")
 # ---------------- ESC-INPUT ----------------
 def esc_input(prompt="> "):
     """Get input from user, ESC returns None"""
