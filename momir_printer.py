@@ -9,6 +9,7 @@ import difflib
 import sys
 import termios
 import tty
+import shutil
 from escpos.printer import Usb
 from PIL import Image
 from io import BytesIO
@@ -32,10 +33,41 @@ WIFI_NETWORKS = [
 
 os.makedirs(IMAGE_FOLDER, exist_ok=True)
 
+# ---------------- ASCII SCALING ----------------
+def scale_ascii(ascii_art, max_width_ratio=0.9):
+    lines = ascii_art.split("\n")
+    
+    term_width = shutil.get_terminal_size().columns
+    target_width = int(term_width * max_width_ratio)
+
+    # Find widest line in original
+    original_width = max(len(line) for line in lines if line)
+
+    if original_width == 0:
+        return ascii_art
+
+    scale = target_width / original_width
+
+    new_lines = []
+
+    for line in lines:
+        if not line:
+            new_lines.append("")
+            continue
+
+        # Horizontal scaling
+        new_line = "".join(ch * max(1, int(scale)) for ch in line)
+
+        # Vertical scaling (repeat lines)
+        repeat = max(1, int(scale * 0.5))
+        for _ in range(repeat):
+            new_lines.append(new_line[:target_width])  # clip just in case
+
+    return "\n".join(new_lines)
 
 # ---------------ASCII ART -----------------
 def show_momir_vig_ascii():
-    ascii_art = r"""
+    raw_ascii = r"""
 ................................................:-----:....@=-+++=+=@..@#*%@@@@@@@..@@@@#**++=======:-::............................................................
 .*******###***##+**+##******%###*#%#==-+@@#%%%%%@@@@@@@@...@@@@@@@@%@-*@@@@@@@%.......@@@@@@@@@@@@%%@%%%@@%%%@@@...@@@%#####*##*###*#%%*=-+####*#*****###*****+***@.
 .************#*#*****#####**####%%%%*-=.%@@%#%%%@@@%@@@@@..@@@@@@@@@@@@..........:-+-......@@@@@@@%@@%@@%%%#@@*..=@@@%#%%%%#*#%%##%@%+---+####*##*#*###********##*@.
@@ -112,6 +144,7 @@ def show_momir_vig_ascii():
 ..@%.=:.....:==.@@@.@%##*=*==-@%*%@--++++++++++++++=+#*++-.@@:..++++++++++++++++++++++++++++++++++++=...@@@@....@@@@:=++==:.@@%%#*@@@@@@@@...==####%*-*@%*%@@%@@@@@.
 .@..............@@@..........................................@:............................................=@*...........................=@@........................
 """
+    ascii_art = scale_ascii(raw_ascii)
     lines = ascii_art.split("\n")
 
     RESET = "\033[0m"
