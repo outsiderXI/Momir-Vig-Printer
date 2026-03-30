@@ -112,7 +112,32 @@ def show_momir_vig_ascii():
 ..@%.=:.....:==.@@@.@%##*=*==-@%*%@--++++++++++++++=+#*++-.@@:..++++++++++++++++++++++++++++++++++++=...@@@@....@@@@:=++==:.@@%%#*@@@@@@@@...==####%*-*@%*%@@%@@@@@.
 .@..............@@@..........................................@:............................................=@*...........................=@@........................
 """
-    print(ascii_art)
+    lines = ascii_art.split("\n")
+
+    # ANSI color codes
+    GREEN = "\033[38;5;46m"
+    BLUE = "\033[38;5;27m"
+    RESET = "\033[0m"
+
+    for i, line in enumerate(lines):
+        # Blend from green (top) to blue (bottom)
+        ratio = i / max(len(lines) - 1, 1)
+
+        # Simple gradient switch midpoint
+        color = GREEN if ratio < 0.5 else BLUE
+
+        for ch in line:
+            if ch.strip():  # only color visible chars
+                sys.stdout.write(f"{color}{ch}{RESET}")
+            else:
+                sys.stdout.write(ch)
+
+            sys.stdout.flush()
+            time.sleep(0.0008)  # speed of fade-in (lower = faster)
+
+        sys.stdout.write("\n")
+
+    print("\n\033[38;5;51mMomir Vig, Simic Visionary\033[0m\n")
 # ---------------- ESC-INPUT ----------------
 def esc_input(prompt="> "):
     """Get input from user, ESC returns None"""
