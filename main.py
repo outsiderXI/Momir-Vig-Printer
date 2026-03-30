@@ -10,6 +10,7 @@ from downloader import initialize_database
 from search import search_card
 from printer import print_card, print_image
 from tokens import load_tokens, smart_token_match
+from search import random_creature_by_cmc
 
 console = Console()
 
@@ -35,15 +36,21 @@ def momir_mode():
 
     while True:
 
-        name = esc_input("Creature name: ")
+        value = esc_input("Discard mana value (1-16): ")
 
-        if name is None:
+        if value is None:
             return
 
-        cid = search_card(name)
+        try:
+            cmc = int(value)
+        except:
+            console.print("Enter a number")
+            continue
+
+        cid = random_creature_by_cmc(cmc)
 
         if not cid:
-            console.print("Card not found")
+            console.print("No creature with that mana value")
             continue
 
         print_card(cid)
