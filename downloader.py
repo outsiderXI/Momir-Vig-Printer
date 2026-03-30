@@ -11,6 +11,30 @@ from config import *
 
 SESSION = requests.Session()
 
+def initialize_database():
+
+    """
+    Ensures database and card data exist.
+    Runs automatically at program startup.
+    """
+
+    import os
+
+    if not BULK_JSON.exists():
+        print("Downloading Scryfall database...")
+        download_bulk_database()
+
+    if not DB_FILE.exists():
+        print("Building SQLite index...")
+        build_sqlite_index()
+
+    if not IMAGE_DIR.exists():
+        IMAGE_DIR.mkdir(parents=True)
+
+    # optional: check if images exist
+    if len(list(IMAGE_DIR.glob("*.jpg"))) < 1000:
+        print("Downloading card images (first run)...")
+        download_all_images()
 def download_bulk_database():
 
     meta = SESSION.get(SCRYFALL_BULK_URL).json()
