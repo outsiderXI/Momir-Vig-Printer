@@ -116,30 +116,22 @@ def show_momir_vig_ascii():
 
     RESET = "\033[0m"
 
-    # Gradient stops (256-color palette)
-    # white → blue → purple → red → green
-    gradient_colors = [15, 51, 27, 63, 93, 129, 161, 196, 202, 46]
+    # RGB colors
+    GREEN = (0, 255, 120)   # slightly “Simic” green
+    BLUE  = (0, 120, 255)   # slightly brighter blue
 
-    def interpolate(c1, c2, t):
-        return int(c1 + (c2 - c1) * t)
+    def lerp(a, b, t):
+        return int(a + (b - a) * t)
 
     def get_color(ratio):
-        # Map ratio across multiple segments
-        segment_count = len(gradient_colors) - 1
-        scaled = ratio * segment_count
-
-        idx = int(scaled)
-        t = scaled - idx
-
-        if idx >= segment_count:
-            return gradient_colors[-1]
-
-        return interpolate(gradient_colors[idx], gradient_colors[idx + 1], t)
+        r = lerp(GREEN[0], BLUE[0], ratio)
+        g = lerp(GREEN[1], BLUE[1], ratio)
+        b = lerp(GREEN[2], BLUE[2], ratio)
+        return f"\033[38;2;{r};{g};{b}m"  # truecolor ANSI
 
     for i, line in enumerate(lines):
         ratio = i / max(len(lines) - 1, 1)
-        color_code = get_color(ratio)
-        color = f"\033[38;5;{color_code}m"
+        color = get_color(ratio)
 
         for ch in line:
             if ch.strip():
@@ -148,7 +140,7 @@ def show_momir_vig_ascii():
                 sys.stdout.write(ch)
 
             sys.stdout.flush()
-            time.sleep(0.0006)
+            time.sleep(0.0005)
 
         sys.stdout.write("\n")
 
