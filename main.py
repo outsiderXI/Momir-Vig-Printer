@@ -4,11 +4,10 @@ from tokens import *
 from printer import print_image
 from downloader import *
 from search import search_card
-from printer import print_card
+from printer import print_image
 from input_utils import esc_input
 from downloader import initialize_database
 from search import search_card
-from printer import print_card, print_image
 from tokens import load_tokens, smart_match
 from search import random_creature_by_cmc
 from tokens import token_mode
