@@ -12,27 +12,49 @@ from printer import print_card, print_image
 from tokens import load_tokens, smart_token_match
 from search import random_creature_by_cmc
 from tokens import token_mode
-from splash import show_splash, loading_bar
+from splash import show_splash, show_quote, type_text
+import time
 
 console = Console()
 
+import time
+from rich.console import Console
+
+console = Console()
+
+
 def startup():
+
+    console.clear()
 
     show_splash()
 
+    console.print()
+
+    type_text("Booting Momir Vig Printer...", 0.04)
+
+    time.sleep(0.5)
+
+    show_quote()
+
+    type_text("Checking creature database...", 0.03)
+
     from downloader import initialize_database
+    initialize_database()
 
-    with loading_bar() as loader:
+    time.sleep(0.5)
 
-        progress, task = loader
+    show_quote()
 
-        progress.update(task, advance=20, description="Checking database...")
-        initialize_database()
+    type_text("Preparing evolutionary matrices...", 0.03)
 
-        progress.update(task, advance=80, description="Loading complete")
+    time.sleep(1)
 
-    console.print("\n[bold green]Momir Printer Ready[/bold green]\n")
+    show_quote()
 
+    console.print()
+    console.print("[bold green]System Ready[/bold green]")
+    console.print()
 def show_menu():
 
     table = Table(title="Momir Printer")
