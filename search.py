@@ -11,14 +11,12 @@ def random_creature_by_cmc(cmc):
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
 
-    cur.execute("""
-    SELECT id,name
-    FROM cards
-    WHERE cmc=? AND type LIKE '%Creature%'
-    """, (cmc,))
+    cur.execute(
+        "SELECT id FROM cards WHERE cmc=?",
+        (cmc,)
+    )
 
     rows = cur.fetchall()
-
     conn.close()
 
     if not rows:
