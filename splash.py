@@ -4,6 +4,11 @@ from PIL import Image
 from pathlib import Path
 import shutil
 import random
+import sys
+import time
+from rich.console import Console
+
+console = Console()
 
 MOMIR_QUOTES = [
     "Consult the Simic Combine...",
@@ -18,13 +23,26 @@ MOMIR_QUOTES = [
     "The experiment begins..."
 ]
 
-console = Console()
+
+def type_text(text, speed=0.03):
+
+    for char in text:
+        sys.stdout.write(char)
+        sys.stdout.flush()
+        time.sleep(speed)
+
+    print()
+
 
 def show_quote():
 
     quote = random.choice(MOMIR_QUOTES)
 
-    console.print(f"\n[cyan]{quote}[/cyan]\n")
+    console.print()
+
+    type_text(quote)
+
+    console.print()
 
 
 def show_splash():
