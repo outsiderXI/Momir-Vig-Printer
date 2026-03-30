@@ -6,8 +6,13 @@ import requests
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from PIL import Image
-
+import requests
+from pathlib import Path
+from config import IMAGE_DIR
 from config import *
+from config import BULK_JSON, DATA_DIR
+
+TOKEN_FILE = DATA_DIR / "tokens.json"
 
 SESSION = requests.Session()
 
@@ -35,6 +40,46 @@ def initialize_database():
     if len(list(IMAGE_DIR.glob("*.jpg"))) < 1000:
         print("Downloading card images (first run)...")
         download_all_images()
+
+    if not TOKEN_FILE.exists():
+        build_token_database()
+        download_token_images()
+
+def build_token_database():
+
+    print("Extracting tokens from Scryfall dataset...")
+
+    with BULK_JSON.open() as f:
+        cards = json.load(f)
+
+    tokens = []
+
+    for card in cards:
+
+        if card.get("layout") != "token":
+            continue
+
+        if "image_uris" not in card:
+            continue
+
+        token = {
+            "id": card["id"],
+            "name": card["name"],
+            "power": card.get("power"),
+            "toughness": card.get("toughness"),
+            "colors": card.get("colors", []),
+            "oracle_text": card.get("oracle_text", ""),
+            "image": card["image_uris"]["normal"],
+            "local_image": None
+        }
+
+        tokens.append(token)
+
+    with TOKEN_FILE.open("w") as f:
+        json.dump(tokens, f)
+
+    print(f"{len(tokens)} tokens extracted.")
+    
 def download_bulk_database():
 
     meta = SESSION.get(SCRYFALL_BULK_URL).json()
@@ -135,3 +180,31 @@ def download_all_images():
     with ThreadPoolExecutor(max_workers=12) as pool:
         for cid,url in rows:
             pool.submit(download_card_image,cid,url)
+
+def download_token_images():
+
+    with TOKEN_FILE.open() as f:
+        tokens = json.load(f)
+
+    for token in tokens:
+
+        path = IMAGE_DIR / f"{token['id']}.jpg"
+
+        if path.exists():
+            token["local_image"] = str(path)
+            continue
+
+        try:
+
+            r = requests.get(token["image"], timeout=30)
+
+            with open(path, "wb") as img:
+                img.write(r.content)
+
+            token["local_image"] = str(path)
+
+        except:
+            print("Failed:", token["name"])
+
+    with TOKEN_FILE.open("w") as f:
+        json.dump(tokens, f)
