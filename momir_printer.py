@@ -116,7 +116,10 @@ def show_momir_vig_ascii():
 # ---------------- ESC-INPUT ----------------
 def esc_input(prompt="> "):
     """Get input from user, ESC returns None"""
-    print(prompt, end="", flush=True)
+    sys.stdout.write("\r\033[K")  # clear line
+    sys.stdout.write(prompt)
+    sys.stdout.flush()
+
     buf = ""
     fd = sys.stdin.fileno()
     old = termios.tcgetattr(fd)
