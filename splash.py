@@ -3,8 +3,28 @@ from rich.progress import Progress
 from PIL import Image
 from pathlib import Path
 import shutil
+import random
+
+MOMIR_QUOTES = [
+    "Consult the Simic Combine...",
+    "Evolving the battlefield...",
+    "Sequencing creature genomes...",
+    "Mutating battlefield organisms...",
+    "Stabilizing mana matrix...",
+    "Summoning creature prototype...",
+    "Calculating mana value distributions...",
+    "Breeding new evolutionary forms...",
+    "Initializing biomantic protocols...",
+    "The experiment begins..."
+]
 
 console = Console()
+
+def show_quote():
+
+    quote = random.choice(MOMIR_QUOTES)
+
+    console.print(f"\n[cyan]{quote}[/cyan]\n")
 
 
 def show_splash():
