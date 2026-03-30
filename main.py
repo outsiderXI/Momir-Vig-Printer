@@ -12,8 +12,26 @@ from printer import print_card, print_image
 from tokens import load_tokens, smart_token_match
 from search import random_creature_by_cmc
 from tokens import token_mode
+from splash import show_splash, loading_bar
 
 console = Console()
+
+def startup():
+
+    show_splash()
+
+    from downloader import initialize_database
+
+    with loading_bar() as loader:
+
+        progress, task = loader
+
+        progress.update(task, advance=20, description="Checking database...")
+        initialize_database()
+
+        progress.update(task, advance=80, description="Loading complete")
+
+    console.print("\n[bold green]Momir Printer Ready[/bold green]\n")
 
 def show_menu():
 
@@ -81,7 +99,7 @@ def token_mode():
 
 def main():
 
-    initialize_database()
+    startup()
 
     while True:
 
