@@ -1,0 +1,5 @@
+requests
+pillow
+rapidfuzz
+rich
+python-escpos
