@@ -11,10 +11,19 @@ from pathlib import Path
 from config import IMAGE_DIR
 from config import *
 from config import BULK_JSON, DATA_DIR
+from requests.adapters import HTTPAdapter
 
 TOKEN_FILE = DATA_DIR / "tokens.json"
 
-SESSION = requests.Session()
+session = requests.Session()
+
+adapter = HTTPAdapter(
+    pool_connections=50,
+    pool_maxsize=50
+)
+
+session.mount("http://", adapter)
+session.mount("https://", adapter)
 
 def initialize_database():
 
@@ -202,7 +211,7 @@ def download_token_images():
 
         try:
 
-            r = requests.get(token["image"], timeout=30)
+            r = session.get(token["image"], timeout=30) # This might need changed back to requests.get instead of session.get
 
             with open(path, "wb") as img:
                 img.write(r.content)
