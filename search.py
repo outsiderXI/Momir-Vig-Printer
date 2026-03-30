@@ -1,6 +1,30 @@
 import sqlite3
 from rapidfuzz import process
 from config import DB_FILE
+import sqlite3
+import random
+from config import DB_FILE
+
+
+def random_creature_by_cmc(cmc):
+
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT id,name
+    FROM cards
+    WHERE cmc=? AND type LIKE '%Creature%'
+    """, (cmc,))
+
+    rows = cur.fetchall()
+
+    conn.close()
+
+    if not rows:
+        return None
+
+    return random.choice(rows)[0]
 
 def search_card(name):
 
