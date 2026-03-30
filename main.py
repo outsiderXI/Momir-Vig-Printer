@@ -14,13 +14,11 @@ def show_menu():
     table = Table(title="Momir Printer")
 
     table.add_column("Option")
-    table.add_column("Action")
+    table.add_column("Mode")
 
-    table.add_row("1","Download Scryfall Database")
-    table.add_row("2","Build SQLite Index")
-    table.add_row("3","Download ALL Images")
-    table.add_row("4","Search and Print Card")
-    table.add_row("ESC","Exit")
+    table.add_row("1", "Momir Vig Mode")
+    table.add_row("2", "Token Mode")
+    table.add_row("ESC", "Exit")
 
     console.print(table)
 
