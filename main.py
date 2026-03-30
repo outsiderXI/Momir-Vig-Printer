@@ -93,7 +93,7 @@ def momir_mode():
             console.print("No creature with that mana value")
             continue
 
-        print_card(cid)
+        print_image(cid)
 
 def token_mode():
 
