@@ -120,22 +120,28 @@ def build_sqlite_index():
     insert_fts = []
 
     for card in cards:
-
+    
+        # Skip non-creatures
+        type_line = card.get("type_line", "")
+        if "Creature" not in type_line:
+            continue
+    
+        # Skip cards without images
         if "image_uris" not in card:
             continue
-
+    
         cid = card["id"]
         name = card["name"]
-
+    
         insert_cards.append((
             cid,
             name,
-            int(card.get("cmc",0)),
-            card.get("type_line",""),
-            card["image_uris"]["normal"]
+            int(card.get("cmc", 0)),
+            type_line,
+            card["image_uris"]["small"]
         ))
-
-        insert_fts.append((name,cid))
+    
+        insert_fts.append((name, cid))
 
     cur.executemany("INSERT INTO cards VALUES (?,?,?,?,?)", insert_cards)
     cur.executemany("INSERT INTO cards_fts VALUES (?,?)", insert_fts)
