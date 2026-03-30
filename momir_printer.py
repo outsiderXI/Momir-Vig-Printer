@@ -124,7 +124,8 @@ def show_momir_vig_ascii():
         ratio = i / max(len(lines) - 1, 1)
 
         # Simple gradient switch midpoint
-        color = GREEN if ratio < 0.5 else BLUE
+        color_code = int(46 + (27 - 46) * ratio)  # green → blue
+        color = f"\033[38;5;{color_code}m"
 
         for ch in line:
             if ch.strip():  # only color visible chars
