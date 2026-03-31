@@ -108,7 +108,7 @@ def token_mode():
         if name is None:
             return
 
-        matches = smart_token_match(tokens, name)
+        matches = smart_match(tokens, name)
 
         if not matches:
             console.print("Token not found")
