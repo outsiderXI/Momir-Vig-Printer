@@ -109,10 +109,10 @@ def build_token_database():
     
 def download_bulk_database():
 
-    meta = SESSION.get(SCRYFALL_BULK_URL).json()
+    meta = session.get(SCRYFALL_BULK_URL).json()
     default_cards = next(x for x in meta["data"] if x["type"] == "default_cards")
 
-    r = SESSION.get(default_cards["download_uri"], stream=True)
+    r = session.get(default_cards["download_uri"], stream=True)
 
     with BULK_JSON.open("wb") as f:
         for chunk in r.iter_content(8192):
