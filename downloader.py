@@ -17,12 +17,14 @@ from concurrent.futures import as_completed
 
 TOKEN_FILE = DATA_DIR / "tokens.json"
 VERSION_FILE = DATA_DIR / "scryfall_version.txt"
+session = requests.Session()
 
 adapter = HTTPAdapter(
     pool_connections=50,
     pool_maxsize=50
 )
 
+session.mount("http://", adapter)
 session.mount("https://", adapter)
 
 def has_internet():
