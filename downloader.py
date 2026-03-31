@@ -12,38 +12,54 @@ from config import IMAGE_DIR
 from config import *
 from config import BULK_JSON, DATA_DIR
 from requests.adapters import HTTPAdapter
+from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn
+from concurrent.futures import as_completed
 
 TOKEN_FILE = DATA_DIR / "tokens.json"
-
-session = requests.Session()
+VERSION_FILE = DATA_DIR / "scryfall_version.txt"
 
 adapter = HTTPAdapter(
     pool_connections=50,
     pool_maxsize=50
 )
 
-session.mount("http://", adapter)
 session.mount("https://", adapter)
+
+def has_internet():
+
+    try:
+        session.get("https://api.scryfall.com", timeout=5)
+        return True
+    except:
+        return False
 
 def initialize_database():
 
-    """
-    Ensures database and card data exist.
-    Runs automatically at program startup.
-    """
+    if not has_internet():
+        print("Offline mode: using local database.")
+        return
 
-    import os
+    print("Checking for card database updates...")
 
-    if not BULK_JSON.exists():
-        print("Downloading Scryfall database...")
+    if not BULK_JSON.exists() or bulk_dataset_updated():
+
+        print("Updating Scryfall database...")
         download_bulk_database()
 
-    if not DB_FILE.exists():
-        print("Building SQLite index...")
+        print("Rebuilding creature index...")
         build_sqlite_index()
+
+        print("Updating token database...")
+        build_token_database()
 
     if not IMAGE_DIR.exists():
         IMAGE_DIR.mkdir(parents=True)
+
+    print("Checking for missing creature images...")
+    download_all_images()
+
+    print("Checking for missing token images...")
+    download_token_images()
 
     # optional: check if images exist
     if len(list(IMAGE_DIR.glob("*.jpg"))) < 1000:
@@ -158,6 +174,21 @@ def build_sqlite_index():
     conn.commit()
     conn.close()
 
+def bulk_dataset_updated():
+
+    meta = session.get(SCRYFALL_BULK_URL).json()
+    default_cards = next(x for x in meta["data"] if x["type"] == "default_cards")
+
+    new_date = default_cards["updated_at"]
+
+    if VERSION_FILE.exists():
+        old_date = VERSION_FILE.read_text().strip()
+        if old_date == new_date:
+            return False
+
+    VERSION_FILE.write_text(new_date)
+    return True
+
 def download_card_image(card_id,url):
 
     path = IMAGE_DIR / f"{card_id}.jpg"
@@ -182,6 +213,8 @@ def download_card_image(card_id,url):
     img.save(tmp)
     tmp.rename(path)
 
+from concurrent.futures import as_completed
+
 def download_all_images():
 
     conn = sqlite3.connect(DB_FILE)
@@ -192,34 +225,65 @@ def download_all_images():
 
     conn.close()
 
-    with ThreadPoolExecutor(max_workers=12) as pool:
-        for cid,url in rows:
-            pool.submit(download_card_image,cid,url)
+    total = len(rows)
+
+    with Progress(
+        TextColumn("[bold green]Downloading creature images"),
+        BarColumn(),
+        TextColumn("{task.completed}/{task.total}"),
+        TimeRemainingColumn(),
+    ) as progress:
+
+        task = progress.add_task("download", total=total)
+
+        with ThreadPoolExecutor(max_workers=12) as pool:
+
+            futures = [
+                pool.submit(download_card_image, cid, url)
+                for cid, url in rows
+            ]
+
+            for f in as_completed(futures):
+                progress.advance(task)
 
 def download_token_images():
 
     with TOKEN_FILE.open() as f:
         tokens = json.load(f)
 
-    for token in tokens:
+    total = len(tokens)
 
-        path = IMAGE_DIR / f"{token['id']}.jpg"
+    with Progress(
+        TextColumn("[bold cyan]Downloading token images"),
+        BarColumn(),
+        TextColumn("{task.completed}/{task.total}"),
+        TimeRemainingColumn(),
+    ) as progress:
 
-        if path.exists():
-            token["local_image"] = str(path)
-            continue
+        task = progress.add_task("download", total=total)
 
-        try:
+        for token in tokens:
 
-            r = session.get(token["image"], timeout=30) # This might need changed back to requests.get instead of session.get
+            path = IMAGE_DIR / f"{token['id']}.jpg"
 
-            with open(path, "wb") as img:
-                img.write(r.content)
+            if path.exists():
+                token["local_image"] = str(path)
+                progress.advance(task)
+                continue
 
-            token["local_image"] = str(path)
+            try:
 
-        except:
-            print("Failed:", token["name"])
+                r = session.get(token["image"], timeout=30)
+
+                with open(path, "wb") as img:
+                    img.write(r.content)
+
+                token["local_image"] = str(path)
+
+            except:
+                print("Failed:", token["name"])
+
+            progress.advance(task)
 
     with TOKEN_FILE.open("w") as f:
         json.dump(tokens, f)
