@@ -59,7 +59,7 @@ If your distro blocks pip globally:
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-pip install escpos pillow requests rapidfuzz
+pip install -r requirements.txt
 ```
 
 ---
