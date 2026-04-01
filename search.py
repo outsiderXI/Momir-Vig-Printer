@@ -1,9 +1,10 @@
 import random
 import sqlite3
+from pathlib import Path
 
 from rapidfuzz import fuzz, process
 
-from config import DB_FILE
+from config import DB_FILE, IMAGE_DIR
 
 
 def random_creature_by_cmc(cmc):
@@ -13,7 +14,7 @@ def random_creature_by_cmc(cmc):
         """
         SELECT id
         FROM cards
-        WHERE is_creature=1 AND cmc=?
+        WHERE is_creature = 1 AND cmc = ?
         """,
         (cmc,),
     )
@@ -44,18 +45,17 @@ def exact_card_id_by_name(name):
     return row[0] if row else None
 
 
-def exact_card_row_by_name(name):
+def get_card_details(card_id):
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT id, name, type_line
+        SELECT id, name, cmc, type_line
         FROM cards
-        WHERE name = ?
-          AND is_token = 0
+        WHERE id = ?
         LIMIT 1
         """,
-        (name,),
+        (card_id,),
     )
     row = cur.fetchone()
     conn.close()
@@ -66,10 +66,9 @@ def search_card_candidates(name, limit=10):
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
 
-    # exact first
     cur.execute(
         """
-        SELECT id, name, type_line
+        SELECT id, name, cmc, type_line
         FROM cards
         WHERE name = ?
           AND is_token = 0
@@ -80,14 +79,13 @@ def search_card_candidates(name, limit=10):
     exact = cur.fetchall()
     if exact:
         conn.close()
-        return exact
+        return _decorate_candidates(exact)
 
-    # FTS prefix search
     prefix_query = " ".join(part + "*" for part in name.split() if part.strip())
     if prefix_query:
         cur.execute(
             """
-            SELECT c.id, c.name, c.type_line
+            SELECT c.id, c.name, c.cmc, c.type_line
             FROM cards_fts f
             JOIN cards c ON c.id = f.id
             WHERE f.name MATCH ?
@@ -99,12 +97,11 @@ def search_card_candidates(name, limit=10):
         fts_rows = cur.fetchall()
         if fts_rows:
             conn.close()
-            return fts_rows
+            return _decorate_candidates(fts_rows)
 
-    # fuzzy fallback
     cur.execute(
         """
-        SELECT name, id, type_line
+        SELECT id, name, cmc, type_line
         FROM cards
         WHERE is_token = 0
         """
@@ -115,21 +112,39 @@ def search_card_candidates(name, limit=10):
     if not rows:
         return []
 
-    names = [r[0] for r in rows]
-    matches = process.extract(name, names, scorer=fuzz.WRatio, limit=limit)
+    name_lookup = [r[1] for r in rows]
+    fuzzy = process.extract(name, name_lookup, scorer=fuzz.WRatio, limit=limit)
 
     out = []
     used = set()
-    for matched_name, score, _ in matches:
+
+    for matched_name, score, _ in fuzzy:
         if score < 70:
             continue
-        for row_name, row_id, type_line in rows:
+        for row in rows:
+            row_id, row_name, row_cmc, row_type = row
             if row_name == matched_name and row_id not in used:
-                out.append((row_id, row_name, type_line))
+                out.append((row_id, row_name, row_cmc, row_type))
                 used.add(row_id)
                 break
 
-    return out
+    return _decorate_candidates(out)
+
+
+def _decorate_candidates(rows):
+    decorated = []
+    for card_id, name, cmc, type_line in rows:
+        cached = (IMAGE_DIR / f"{card_id}.jpg").exists()
+        decorated.append(
+            {
+                "id": card_id,
+                "name": name,
+                "cmc": cmc,
+                "type_line": type_line,
+                "cached": cached,
+            }
+        )
+    return decorated
 
 
 def search_card(name):
@@ -138,4 +153,22 @@ def search_card(name):
         return exact
 
     candidates = search_card_candidates(name, limit=1)
-    return candidates[0][0] if candidates else None
+    return candidates[0]["id"] if candidates else None
+
+
+def cache_stats():
+    image_count = len(list(IMAGE_DIR.glob("*.jpg")))
+    image_size = sum(p.stat().st_size for p in IMAGE_DIR.glob("*.jpg") if p.is_file())
+    return {
+        "image_count": image_count,
+        "image_size_bytes": image_size,
+    }
+
+
+def human_size(num_bytes):
+    value = float(num_bytes)
+    units = ["B", "KB", "MB", "GB", "TB"]
+    for unit in units:
+        if value < 1024 or unit == units[-1]:
+            return f"{value:.1f} {unit}"
+        value /= 1024
