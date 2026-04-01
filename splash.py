@@ -53,8 +53,7 @@ def show_quote():
     console.print(Align.center(Text(quote, style="italic bright_black")))
     console.print()
 
-
-def show_splash():
+def show_splash(delay=0.045):
     console.clear()
 
     image_path = Path("assets/momir_vig.png")
@@ -88,15 +87,11 @@ def show_splash():
             row += chars[idx]
         lines.append(row)
 
-    art = "\n".join(lines)
+    console.print(Panel("", border_style="bright_green", padding=(0, 1)))
 
-    console.print(
-        Panel(
-            Align.center(Text(art, style="green")),
-            border_style="bright_green",
-            padding=(0, 1),
-        )
-    )
+    for line in lines:
+        console.print(Align.center(Text(line, style="green")))
+        time.sleep(delay)
 
 
 def show_boot_sequence():
