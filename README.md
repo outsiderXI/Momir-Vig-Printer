@@ -1,174 +1,199 @@
-Here’s the **typical workflow on Ubuntu** to download your project from GitHub and run the Momir printer application.
+# Momir Vig Printer (v2)
 
-I’ll assume the repository is something like:
+A **fully offline-capable Magic: The Gathering thermal printer app** for **Linux servers and Raspberry Pi**.
 
-```
-https://github.com/USERNAME/momir-printer
-```
+This project supports **three unified print modes from a single prompt**:
+
+* **Momir Mode** → enter a number `1–16` to print a random creature with that mana value
+* **Token Mode** → enter a token name like `treasure`, `zombie`, or `rat`
+* **Any Card Mode** → enter any card name like `Lightning Bolt` or `Jace, the Mind Sculptor`
+
+The application automatically decides which mode to use based on your input.
 
 ---
 
-# 1. Install Required System Packages
+# Features
 
-Open a terminal and run:
+* ✅ Unified input system (no mode menu required)
+* ✅ Fully offline after first sync
+* ✅ SQLite searchable local database
+* ✅ Random Momir creature printing by mana value
+* ✅ Token disambiguation (PT, color, choose list)
+* ✅ Print any card by exact or fuzzy name
+* ✅ Automatic image caching
+* ✅ Token image caching
+* ✅ Rich progress bars for downloads
+* ✅ Automatic startup on Raspberry Pi / Linux boot
+* ✅ Works great with USB thermal printers
+
+---
+
+# Hardware Requirements
+
+Recommended:
+
+* Raspberry Pi 4 / Pi Zero 2 W
+* Debian / Raspberry Pi OS
+* USB thermal printer (ESC/POS compatible)
+* Stable SD card (16GB+ recommended)
+
+---
+
+# Software Requirements
+
+Install system packages:
 
 ```bash
 sudo apt update
-sudo apt install -y git python3 python3-pip python3-venv
+sudo apt install -y python3 python3-pip python3-venv python3-tqdm python3-rich git
 ```
 
-If you're using a **USB ESC/POS printer**, also install:
+Install Python dependencies:
 
 ```bash
-sudo apt install -y libusb-1.0-0
+pip3 install escpos pillow requests rapidfuzz
 ```
 
----
-
-# 2. Clone Your GitHub Repository
-
-```bash
-git clone https://github.com/USERNAME/momir-printer.git
-```
-
-Enter the project folder:
-
-```bash
-cd momir-printer
-```
-
----
-
-# 3. Create a Python Virtual Environment (recommended)
+If your distro blocks pip globally:
 
 ```bash
 python3 -m venv venv
-```
-
-Activate it:
-
-```bash
 source venv/bin/activate
-```
-
-Your terminal should now show:
-
-```
-(venv)
+pip install escpos pillow requests rapidfuzz
 ```
 
 ---
 
-# 4. Install Python Dependencies
+# Installation
 
-Install everything from `requirements.txt`:
-
-```bash
-pip install -r requirements.txt
-```
-
-This installs things like:
-
-* requests
-* pillow
-* rapidfuzz
-* rich
-* python-escpos
-
----
-
-# 5. Run the Application
-
-Start the program:
+Clone the repo:
 
 ```bash
-python main.py
+git clone https://github.com/outsiderXI/Momir-Vig-Printer.git
+cd Momir-Vig-Printer
+git checkout v2
 ```
 
-On first run it will automatically:
+Run the application:
 
-```
-download Scryfall dataset
-build creature database
-extract tokens
-download creature images
-download token images
-```
-
-This may take **10–30 minutes depending on internet speed**.
-
-After setup finishes you'll see:
-
-```
-Momir Printer
-
-1 Momir Vig Mode
-2 Token Mode
-ESC Exit
+```bash
+python3 main.py
 ```
 
 ---
 
-# 6. Printer Permissions (Very Important)
+# First Startup (Important)
 
-Linux often blocks USB printer access.
+The **first run takes several minutes**.
 
-Create a **udev rule**:
+During startup the app will:
 
-```bash
-sudo nano /etc/udev/rules.d/99-escpos.rules
-```
+1. Download the full Scryfall bulk dataset
+2. Build a local SQLite database
+3. Extract all tokens
+4. Download all Momir creature images (CMC 0–16)
+5. Download all token images
 
-Add:
+You will see progress bars for:
 
-```bash
-SUBSYSTEM=="usb", ATTR{idVendor}=="04b8", ATTR{idProduct}=="0202", MODE="0666"
-```
+* dataset download
+* creature image download
+* token image download
 
-Then reload rules:
-
-```bash
-sudo udevadm control --reload-rules
-sudo udevadm trigger
-```
-
-Reconnect the printer.
+After this finishes, the app becomes **fully offline capable**.
 
 ---
 
-# 7. Test Printing
+# How To Use
 
-Run again:
+After boot, the prompt waits for input.
 
-```bash
-python main.py
+## 1) Momir Mode
+
+Enter a mana value:
+
+```text
+> 7
 ```
 
-Choose:
+This prints a **random 7-drop creature**.
 
-```
-1 → Momir Vig Mode
-```
+Supported values:
 
-Enter:
-
-```
-6
-```
-
-It should:
-
-```
-select random CMC 6 creature
-load local image
-print card
+```text
+1–16
 ```
 
 ---
 
-# Optional: Auto-Start on Boot (for dedicated device)
+## 2) Token Mode
 
-If this will run on a **Raspberry Pi or mini-PC inside the printer**, you can make it auto-start.
+Enter a token name:
+
+```text
+> treasure
+> zombie
+> rat
+```
+
+If multiple versions exist, the app will ask for:
+
+* optional power/toughness
+* optional colors
+* numbered selection list
+
+Example:
+
+```text
+> zombie
+Optional PT: 2/2
+Optional colors: black
+```
+
+---
+
+## 3) Any Card Mode
+
+Enter any card name:
+
+```text
+> Lightning Bolt
+> Sol Ring
+> Atraxa, Praetors' Voice
+```
+
+The app will:
+
+* exact match first
+* then fuzzy search
+* ask you to choose if multiple matches exist
+* download image if missing
+* cache for future offline use
+
+---
+
+# Offline Mode
+
+After first startup, the app stores:
+
+```text
+data/
+cache/
+```
+
+This includes:
+
+* local SQLite card database
+* token database
+* cached creature images
+* cached token images
+* lazily cached non-creature card images
+
+Once cached, all future prints work **without internet**.
+
+---
+
+# Automatic Launch On Boot (Recommended)
 
 Create a systemd service:
 
@@ -176,18 +201,23 @@ Create a systemd service:
 sudo nano /etc/systemd/system/momir-printer.service
 ```
 
-Example:
+Paste:
 
 ```ini
 [Unit]
-Description=Momir Printer
-After=network.target
+Description=Momir Vig Printer
+After=network-online.target
+Wants=network-online.target
 
 [Service]
-User=ubuntu
-WorkingDirectory=/home/ubuntu/momir-printer
-ExecStart=/home/ubuntu/momir-printer/venv/bin/python main.py
+Type=simple
+User=momir
+WorkingDirectory=/home/momir/Momir-Vig-Printer
+ExecStart=/usr/bin/python3 /home/momir/Momir-Vig-Printer/main.py
 Restart=always
+RestartSec=3
+StandardInput=tty
+TTYPath=/dev/tty1
 
 [Install]
 WantedBy=multi-user.target
@@ -196,33 +226,117 @@ WantedBy=multi-user.target
 Enable it:
 
 ```bash
-sudo systemctl enable momir-printer
+sudo systemctl daemon-reload
+sudo systemctl enable momir-printer.service
+sudo systemctl start momir-printer.service
 ```
 
-Start it:
+Check status:
 
 ```bash
-sudo systemctl start momir-printer
-```
-
-Now it runs automatically at boot.
-
----
-
-# Final Workflow on a Fresh Ubuntu Device
-
-```bash
-sudo apt install git python3 python3-pip python3-venv
-git clone https://github.com/USERNAME/momir-printer.git
-cd momir-printer
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python main.py
+sudo systemctl status momir-printer.service
 ```
 
 ---
 
-If you'd like, I can also show you **one extremely useful thing for this project**:
+# Raspberry Pi Kiosk / Arcade Mode
 
-How to make the entire printer run as a **single executable with PyInstaller**, so the Ubuntu device doesn’t even need Python installed. This is great for **turning the project into a plug-and-play appliance**.
+For a console-appliance feel:
+
+```bash
+sudo raspi-config
+```
+
+Go to:
+
+```text
+System Options → Boot / Auto Login → Console Autologin
+```
+
+This makes the Pi boot directly into the app.
+
+---
+
+# Project Structure
+
+```text
+Momir-Vig-Printer/
+├── main.py
+├── downloader.py
+├── printer.py
+├── search.py
+├── tokens.py
+├── config.py
+├── data/
+│   ├── cards.sqlite
+│   ├── default_cards.json
+│   └── tokens.json
+└── cache/
+    └── *.jpg
+```
+
+---
+
+# Troubleshooting
+
+## No printer found
+
+Check USB device:
+
+```bash
+lsusb
+```
+
+Update `config.py` with correct:
+
+* vendor ID
+* product ID
+
+---
+
+## Download stalls
+
+Check internet:
+
+```bash
+ping api.scryfall.com
+```
+
+---
+
+## Missing tqdm or rich
+
+Install Debian packages:
+
+```bash
+sudo apt install python3-tqdm python3-rich
+```
+
+---
+
+## Permission denied on printer
+
+Run with proper USB permissions or add user to `lp` group:
+
+```bash
+sudo usermod -aG lp momir
+```
+
+Then reboot.
+
+---
+
+# Recommended SD Card Size
+
+Recommended minimum:
+
+```text
+16GB
+```
+
+Typical usage:
+
+* DB + metadata: ~400MB
+* creatures + tokens: ~1GB
+* lazy printed cards: grows over time
+
