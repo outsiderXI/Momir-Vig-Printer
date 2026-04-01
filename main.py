@@ -1,127 +1,87 @@
+import random
+import shutil
+import sys
 import time
+from pathlib import Path
 
+from PIL import Image
+from rich.align import Align
 from rich.console import Console
-
-from downloader import ensure_card_image, initialize_database
-from input_utils import esc_input
-from printer import print_image
-from search import random_creature_by_cmc, search_card_candidates
-from splash import show_quote, show_splash, type_text
-from tokens import token_mode_from_name
+from rich.panel import Panel
+from rich.text import Text
 
 console = Console()
 
+MOMIR_QUOTES = [
+    "Consult the Simic Combine...",
+    "Evolving the battlefield...",
+    "Sequencing creature genomes...",
+    "Mutating battlefield organisms...",
+    "Stabilizing mana matrix...",
+    "Summoning creature prototype...",
+    "Calculating mana value distributions...",
+    "Breeding new evolutionary forms...",
+    "Initializing biomantic protocols...",
+    "The experiment begins...",
+]
 
-def startup():
+
+def type_text(text, speed=0.02):
+    for char in text:
+        sys.stdout.write(char)
+        sys.stdout.flush()
+        time.sleep(speed)
+    print()
+
+
+def show_quote():
+    quote = random.choice(MOMIR_QUOTES)
+    console.print(
+        Align.center(
+            Text(quote, style="italic bright_black")
+        )
+    )
+    console.print()
+
+
+def show_splash():
     console.clear()
-    show_splash()
-    console.print()
-    type_text("Booting Momir Vig Printer...", 0.04)
-    time.sleep(0.5)
-    show_quote()
-    type_text("Checking local card database...", 0.03)
-    initialize_database()
-    time.sleep(0.5)
-    show_quote()
-    type_text("Ready for card input...", 0.03)
-    time.sleep(0.5)
-    console.print()
-    console.print("[bold green]System Ready[/bold green]")
-    console.print()
 
-
-def show_prompt():
-    console.print("[bold cyan]Enter a CMC 1-16, a token name, or a card name.[/bold cyan]")
-    console.print("[dim]Press ESC to exit.[/dim]")
-    return esc_input("> ")
-
-
-def print_random_creature_by_cmc(cmc):
-    card_id = random_creature_by_cmc(cmc)
-    if not card_id:
-        console.print(f"No creature found with mana value {cmc}.")
+    image_path = Path("assets/momir_vig.png")
+    if not image_path.exists():
+        console.print(
+            Panel(
+                Align.center(Text("MOMIR VIG PRINTER", style="bold bright_green")),
+                border_style="green",
+            )
+        )
         return
 
-    path = ensure_card_image(card_id)
-    if not path:
-        console.print("Creature image missing and could not be downloaded.")
-        return
+    term_width = shutil.get_terminal_size().columns
+    img = Image.open(image_path)
+    scale = min((term_width - 10) / img.width, 1)
+    new_w = max(20, int(img.width * scale))
+    new_h = max(8, int(img.height * scale * 0.5))
+    img = img.resize((new_w, new_h))
+    img = img.convert("L")
 
-    console.print(f"Printing random creature with mana value {cmc}...")
-    print_image(card_id)
+    pixels = img.load()
+    chars = " .:-=+*#%@"
 
+    lines = []
+    for y in range(img.height):
+        row = ""
+        for x in range(img.width):
+            brightness = pixels[x, y]
+            row += chars[min(len(chars) - 1, int(brightness / 256 * len(chars)))]
+        lines.append(row)
 
-def choose_card_candidate(candidates):
-    if len(candidates) == 1:
-        return candidates[0]
+    art = "\n".join(lines)
 
-    console.print("\n[bold yellow]Multiple card matches found:[/bold yellow]")
-    limited = candidates[:10]
-    for i, (_, name, type_line) in enumerate(limited, start=1):
-        console.print(f"{i}: {name} — {type_line}")
-
-    while True:
-        choice = esc_input("Select number (ESC to cancel): ")
-        if choice is None:
-            return None
-        if choice.isdigit():
-            idx = int(choice) - 1
-            if 0 <= idx < len(limited):
-                return limited[idx]
-        console.print("Invalid selection.")
-
-
-def print_named_card(name):
-    candidates = search_card_candidates(name, limit=10)
-    if not candidates:
-        console.print("No matching non-token card found.")
-        return False
-
-    selected = choose_card_candidate(candidates)
-    if not selected:
-        return False
-
-    card_id, card_name, _type_line = selected
-
-    path = ensure_card_image(card_id)
-    if not path:
-        console.print("Card image missing and could not be downloaded.")
-        return False
-
-    console.print(f"Printing card: {card_name}")
-    return print_image(card_id)
-
-
-def handle_input(text):
-    raw = text.strip()
-    if not raw:
-        return
-
-    if raw.isdigit():
-        cmc = int(raw)
-        if 1 <= cmc <= 16:
-            print_random_creature_by_cmc(cmc)
-            return
-
-    # token flow first for non-numeric input
-    if token_mode_from_name(raw):
-        return
-
-    # then regular card flow
-    if print_named_card(raw):
-        return
-
-    console.print("No token or card match found.")
-
-
-def main():
-    startup()
-    while True:
-        value = show_prompt()
-        if value is None:
-            break
-        handle_input(value)
-
-
-if __name__ == "__main__":
-    main()
+    console.print(
+        Panel(
+            Align.center(Text(art, style="green")),
+            border_style="bright_green",
+            padding=(0, 1),
+        )
+    )
