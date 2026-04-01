@@ -248,7 +248,7 @@ def build_token_database():
 
 
 def _process_and_save_image_bytes(content, path):
-    tmp = path.with_suffix(".tmp")
+    tmp = path.with_name(path.stem + ".tmp.jpg")
 
     img = Image.open(BytesIO(content))
     scale = PRINTER_MAX_WIDTH / img.width
@@ -257,8 +257,9 @@ def _process_and_save_image_bytes(content, path):
 
     img = img.resize((w, h), Image.LANCZOS)
     img = img.convert("L").convert("1", dither=Image.FLOYDSTEINBERG)
-    img.save(tmp)
-    tmp.rename(path)
+
+    img.save(tmp, format="JPEG")
+    tmp.replace(path)
 
 
 def download_card_image(card_id, url):
