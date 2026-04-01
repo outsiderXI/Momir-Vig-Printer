@@ -238,6 +238,8 @@ def build_token_database():
             "oracle_text": card.get("oracle_text", ""),
             "image": image,
             "local_image": None,
+            "set_name": card.get("set_name", ""),
+            "set_code": card.get("set", "").upper(),
         }
         tokens.append(token)
 
