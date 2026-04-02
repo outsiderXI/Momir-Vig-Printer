@@ -166,6 +166,21 @@ def choose_card_candidate(candidates):
 
 
 def print_named_card(name):
+    from search import exact_card_row_by_name
+
+    exact = exact_card_row_by_name(name)
+    if exact:
+        card_id, card_name, card_cmc, type_line = exact
+
+        path = ensure_card_image(card_id)
+        if not path:
+            console.print("[bold red]Card image missing and could not be downloaded.[/bold red]")
+            return False
+
+        render_card_preview(card_name, card_cmc, type_line, True)
+        console.print(f"[bold green]Printing card:[/bold green] [bold white]{card_name}[/bold white]")
+        return print_image(card_id)
+
     candidates = search_card_candidates(name, limit=10)
     if not candidates:
         console.print("[bold red]No matching non-token card found.[/bold red]")
