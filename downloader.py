@@ -6,7 +6,7 @@ from io import BytesIO
 from pathlib import Path
 
 import requests
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter
 from requests.adapters import HTTPAdapter
 from rich.progress import (
     BarColumn,
@@ -286,17 +286,26 @@ def build_token_database():
 def _process_and_save_image_bytes(content, path):
     tmp = path.with_name(path.stem + ".tmp.jpg")
 
-    img = Image.open(BytesIO(content))
+    img = Image.open(BytesIO(content)).convert("L")
+
     scale = PRINTER_MAX_WIDTH / img.width
     w = max(1, int(img.width * scale))
     h = max(1, int(img.height * scale))
 
+    # High-quality resize
     img = img.resize((w, h), Image.LANCZOS)
-    img = img.convert("L").convert("1", dither=Image.FLOYDSTEINBERG)
 
-    img.save(tmp, format="JPEG")
+    # Boost contrast for better text readability
+    img = ImageEnhance.Contrast(img).enhance(1.8)
+
+    # Slight sharpen helps rules text a LOT
+    img = img.filter(ImageFilter.SHARPEN)
+
+    # Convert to thermal black/white
+    img = img.convert("1", dither=Image.FLOYDSTEINBERG)
+
+    img.save(tmp)
     tmp.replace(path)
-
 
 def download_card_image(card_id, url):
     path = IMAGE_DIR / f"{card_id}.jpg"
