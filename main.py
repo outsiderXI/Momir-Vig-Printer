@@ -181,7 +181,7 @@ def print_named_card(name):
         console.print(f"[bold green]Printing card:[/bold green] [bold white]{card_name}[/bold white]")
         return print_image(card_id)
 
-    candidates = search_card_candidates(name, limit=10)
+    candidates = search_card_candidates(name, limit=20)
     if not candidates:
         console.print("[bold red]No matching non-token card found.[/bold red]")
         return False
