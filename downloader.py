@@ -122,12 +122,17 @@ def download_bulk_database():
 
 def _card_image_url(card):
     if "image_uris" in card:
-        return card["image_uris"].get("small") or card["image_uris"].get("normal")
+        return (
+            card["image_uris"].get("large")
+            or card["image_uris"].get("normal")
+        )
 
-    card_faces = card.get("card_faces", [])
-    for face in card_faces:
+    for face in card.get("card_faces", []):
         if "image_uris" in face:
-            return face["image_uris"].get("small") or face["image_uris"].get("normal")
+            return (
+                face["image_uris"].get("large")
+                or face["image_uris"].get("normal")
+            )
 
     return None
 
