@@ -1,4 +1,4 @@
-# Momir Vig Printer v2
+# Momir Vig Printer
 
 A polished **Raspberry Pi / Linux MTG thermal card printer** that supports:
 
