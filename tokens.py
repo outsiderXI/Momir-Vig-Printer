@@ -179,7 +179,6 @@ def choose_from_list(matches):
 
         console.print("[red]Invalid selection.[/red]")
 
-
 def print_multiple(path):
     console.print()
     count_input = esc_input("How many copies? (default 1): ")
@@ -197,6 +196,7 @@ def print_multiple(path):
         count = 1
 
     for i in range(count):
+        console.print()
         console.print(f"[green]Printing copy {i+1}/{count}[/green]")
         print_image(path)
         time.sleep(0.3)
@@ -244,13 +244,17 @@ def select_token_from_name(name):
 
     return matches[0]
 
-
 def token_mode_from_name(name):
     card = select_token_from_name(name)
     if not card:
         return False
 
-    console.print(f"[bold magenta]Printing token:[/bold magenta] [bold white]{card['name']}[/bold white]")
+    console.print()
+    console.print(
+        f"[bold magenta]Printing token:[/bold magenta] "
+        f"[bold white]{card['name']}[/bold white]"
+    )
+
     path = card.get("local_image")
     if path:
         print_multiple(path)
