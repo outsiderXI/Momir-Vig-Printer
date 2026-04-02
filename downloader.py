@@ -65,8 +65,9 @@ def initialize_database():
         print("Token database missing, rebuilding...")
         build_token_database()
 
-    print("Checking for missing Momir creature images...")
-    download_momir_creature_images()
+    print("Full image cache mode enabled. First startup may take a long time.")
+    print("Checking for missing card images...")
+    download_all_card_images()
 
     print("Checking for missing token images...")
     download_token_images()
@@ -162,7 +163,19 @@ def build_sqlite_index():
             type_line TEXT,
             image TEXT,
             is_creature INTEGER NOT NULL DEFAULT 0,
-            is_token INTEGER NOT NULL DEFAULT 0
+            is_token INTEGER NOT NULL DEFAULT 0,
+            released_at TEXT,
+            set_code TEXT,
+            set_name TEXT,
+            rarity TEXT,
+            lang TEXT,
+            promo INTEGER NOT NULL DEFAULT 0,
+            border_color TEXT,
+            frame TEXT,
+            full_art INTEGER NOT NULL DEFAULT 0,
+            textless INTEGER NOT NULL DEFAULT 0,
+            oversized INTEGER NOT NULL DEFAULT 0,
+            digital INTEGER NOT NULL DEFAULT 0
         )
         """
     )
@@ -179,8 +192,6 @@ def build_sqlite_index():
     insert_cards = []
     insert_fts = []
 
-    seen_names = set()
-
     for card in cards:
         if not _is_printable_paper_card(card):
             continue
@@ -194,14 +205,37 @@ def build_sqlite_index():
         is_creature = 1 if "Creature" in type_line else 0
         is_token = 1 if card.get("layout") == "token" else 0
 
-        insert_cards.append((cid, name, cmc, type_line, image_url, is_creature, is_token))
+        insert_cards.append(
+            (
+                cid,
+                name,
+                cmc,
+                type_line,
+                image_url,
+                is_creature,
+                is_token,
+                card.get("released_at"),
+                card.get("set", "").upper(),
+                card.get("set_name", ""),
+                card.get("rarity", ""),
+                card.get("lang", ""),
+                1 if card.get("promo") else 0,
+                card.get("border_color", ""),
+                card.get("frame", ""),
+                1 if card.get("full_art") else 0,
+                1 if card.get("textless") else 0,
+                1 if card.get("oversized") else 0,
+                1 if card.get("digital") else 0,
+            )
+        )
         insert_fts.append((name, cid))
 
-        # keep one canonical printable entry per exact name for fast exact search
-        if name not in seen_names:
-            seen_names.add(name)
-
-    cur.executemany("INSERT OR REPLACE INTO cards VALUES (?,?,?,?,?,?,?)", insert_cards)
+    cur.executemany(
+        """
+        INSERT OR REPLACE INTO cards VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """,
+        insert_cards,
+    )
     cur.executemany("INSERT INTO cards_fts VALUES (?,?)", insert_fts)
 
     cur.execute("CREATE INDEX IF NOT EXISTS idx_cards_name ON cards(name)")
@@ -299,15 +333,16 @@ def ensure_card_image(card_id):
         return None
 
 
-def download_momir_creature_images():
+def download_all_card_images():
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
     cur.execute(
         """
         SELECT id, image
         FROM cards
-        WHERE is_creature=1
-          AND cmc BETWEEN 0 AND 16
+        WHERE is_token = 0
+          AND image IS NOT NULL
+          AND image != ''
         """
     )
     rows = cur.fetchall()
@@ -317,11 +352,11 @@ def download_momir_creature_images():
     total = len(missing_rows)
 
     if total == 0:
-        print("All Momir creature images already cached.")
+        print("All card images already cached.")
         return
 
     with Progress(
-        TextColumn("[bold green]Downloading creature images"),
+        TextColumn("[bold green]Downloading all card images"),
         BarColumn(),
         TaskProgressColumn(),
         TextColumn("{task.completed}/{task.total}"),
@@ -335,7 +370,7 @@ def download_momir_creature_images():
                 try:
                     future.result()
                 except Exception as e:
-                    logging.warning("Creature image download failed: %s", e)
+                    logging.warning("Card image download failed: %s", e)
                 progress.advance(task)
 
 
