@@ -53,6 +53,7 @@ def show_quote():
     console.print(Align.center(Text(quote, style="italic bright_black")))
     console.print()
 
+
 def show_splash(delay=0.045):
     console.clear()
 
@@ -92,7 +93,6 @@ def show_splash(delay=0.045):
     for line in lines:
         console.print(Align.center(Text(line, style="green")))
         time.sleep(delay)
-
 
 def show_boot_sequence():
     with Progress(
