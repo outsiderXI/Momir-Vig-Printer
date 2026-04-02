@@ -288,8 +288,8 @@ def _process_and_save_image_bytes(content, path):
 
     img = Image.open(BytesIO(content))
     scale = PRINTER_MAX_WIDTH / img.width
-    w = max(1, int(img.width * scale * 1.2))
-    h = max(1, int(img.height * scale * 1.2))
+    w = max(1, int(img.width * scale))
+    h = max(1, int(img.height * scale))
 
     img = img.resize((w, h), Image.LANCZOS)
     img = img.convert("L").convert("1", dither=Image.FLOYDSTEINBERG)
