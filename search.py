@@ -1,6 +1,5 @@
 import random
 import sqlite3
-from pathlib import Path
 
 from rapidfuzz import fuzz, process
 
@@ -27,24 +26,6 @@ def random_creature_by_cmc(cmc):
     return random.choice(rows)[0]
 
 
-def exact_card_id_by_name(name):
-    conn = sqlite3.connect(DB_FILE)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT id
-        FROM cards
-        WHERE name = ?
-          AND is_token = 0
-        LIMIT 1
-        """,
-        (name,),
-    )
-    row = cur.fetchone()
-    conn.close()
-    return row[0] if row else None
-
-
 def get_card_details(card_id):
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
@@ -62,24 +43,71 @@ def get_card_details(card_id):
     return row
 
 
-def search_card_candidates(name, limit=10):
+def exact_card_row_by_name(name):
+    """
+    Return one preferred exact non-token printing automatically.
+
+    Preference order:
+    - exact English paper card
+    - not promo
+    - not full art
+    - not textless
+    - black border
+    - normal modern frame
+    - earliest release among normal printings
+    """
+
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
 
     cur.execute(
         """
-        SELECT id, name, cmc, type_line
+        SELECT
+            id,
+            name,
+            cmc,
+            type_line
         FROM cards
         WHERE name = ?
           AND is_token = 0
-        LIMIT ?
+        ORDER BY
+            CASE WHEN lang = 'en' THEN 0 ELSE 1 END,
+            CASE WHEN promo = 0 THEN 0 ELSE 1 END,
+            CASE WHEN full_art = 0 THEN 0 ELSE 1 END,
+            CASE WHEN textless = 0 THEN 0 ELSE 1 END,
+            CASE WHEN border_color = 'black' THEN 0 ELSE 1 END,
+            CASE WHEN frame = '2015' THEN 0
+                 WHEN frame = '2003' THEN 1
+                 WHEN frame = '1997' THEN 2
+                 ELSE 3
+            END,
+            CASE WHEN rarity = 'common' THEN 0
+                 WHEN rarity = 'uncommon' THEN 1
+                 WHEN rarity = 'rare' THEN 2
+                 WHEN rarity = 'mythic' THEN 3
+                 ELSE 4
+            END,
+            released_at ASC,
+            set_code ASC,
+            id ASC
+        LIMIT 1
         """,
-        (name, limit),
+        (name,),
     )
-    exact = cur.fetchall()
-    if exact:
-        conn.close()
-        return _decorate_candidates(exact)
+
+    row = cur.fetchone()
+    conn.close()
+    return row
+
+
+def exact_card_id_by_name(name):
+    row = exact_card_row_by_name(name)
+    return row[0] if row else None
+
+
+def search_card_candidates(name, limit=10):
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
 
     prefix_query = " ".join(part + "*" for part in name.split() if part.strip())
     if prefix_query:
@@ -116,17 +144,16 @@ def search_card_candidates(name, limit=10):
     fuzzy = process.extract(name, name_lookup, scorer=fuzz.WRatio, limit=limit)
 
     out = []
-    used = set()
+    used_names = set()
 
     for matched_name, score, _ in fuzzy:
-        if score < 70:
+        if score < 70 or matched_name in used_names:
             continue
-        for row in rows:
-            row_id, row_name, row_cmc, row_type = row
-            if row_name == matched_name and row_id not in used:
-                out.append((row_id, row_name, row_cmc, row_type))
-                used.add(row_id)
-                break
+
+        used_names.add(matched_name)
+        preferred = exact_card_row_by_name(matched_name)
+        if preferred:
+            out.append(preferred)
 
     return _decorate_candidates(out)
 
