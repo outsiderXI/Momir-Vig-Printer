@@ -105,7 +105,7 @@ def exact_card_id_by_name(name):
     return row[0] if row else None
 
 
-def search_card_candidates(name, limit=10):
+def search_card_candidates(name, limit=20):
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
 
